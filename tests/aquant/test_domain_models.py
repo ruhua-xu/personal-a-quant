@@ -257,6 +257,17 @@ def test_manual_order_plan_estimated_amount_is_decimal_and_read_only() -> None:
         manual_order_plan(estimated_amount=Decimal("1"))
 
 
+def test_manual_order_plan_reason_is_trimmed() -> None:
+    plan = manual_order_plan(reason="  allocation drift exceeds threshold  ")
+
+    assert plan.reason == "allocation drift exceeds threshold"
+
+
+def test_manual_order_plan_rejects_blank_reason() -> None:
+    with pytest.raises(ValidationError):
+        manual_order_plan(reason="   ")
+
+
 def test_manual_execution_rejects_naive_datetime() -> None:
     with pytest.raises(ValidationError):
         manual_execution(executed_at=datetime(2026, 9, 3, 9, 2, 3))
@@ -278,3 +289,29 @@ def test_risk_violation_keeps_structured_metadata() -> None:
 
     assert violation.severity is RiskSeverity.BLOCK
     assert violation.metadata == {"limit": "0.25"}
+
+
+def test_risk_violation_normalizes_required_text_and_blank_field() -> None:
+    violation = RiskViolation(
+        code="  POSITION_LIMIT  ",
+        severity=RiskSeverity.WARNING,
+        message="  Target position is near the configured limit  ",
+        field="   ",
+    )
+
+    assert violation.code == "POSITION_LIMIT"
+    assert violation.message == "Target position is near the configured limit"
+    assert violation.field is None
+
+
+@pytest.mark.parametrize("required_field", ["code", "message"])
+def test_risk_violation_rejects_blank_required_text(required_field: str) -> None:
+    values = {
+        "code": "POSITION_LIMIT",
+        "severity": RiskSeverity.BLOCK,
+        "message": "Target position exceeds the configured limit",
+    }
+    values[required_field] = "   "
+
+    with pytest.raises(ValidationError):
+        RiskViolation(**values)

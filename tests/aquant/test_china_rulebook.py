@@ -33,13 +33,17 @@ FORBIDDEN_IMPORT_ROOTS = {
 }
 
 
-def cn_etf() -> InstrumentId:
+def cn_etf(
+    *,
+    exchange: Exchange = Exchange.XSHG,
+    currency: Currency = Currency.CNY,
+) -> InstrumentId:
     return InstrumentId(
         market=Market.CN,
-        exchange=Exchange.XSHG,
+        exchange=exchange,
         symbol="510300",
         asset_type=AssetType.ETF,
-        currency=Currency.CNY,
+        currency=currency,
     )
 
 
@@ -62,13 +66,24 @@ def test_china_rulebook_exposes_explicit_market_defaults() -> None:
     assert getattr(rulebook.timezone, "key", None) == "Asia/Shanghai"
 
 
-def test_china_rulebook_accepts_cn_instrument() -> None:
-    ChinaEquityRuleBook().validate_instrument(cn_etf())
+@pytest.mark.parametrize("exchange", [Exchange.XSHG, Exchange.XSHE])
+def test_china_rulebook_accepts_supported_cn_instrument(exchange: Exchange) -> None:
+    ChinaEquityRuleBook().validate_instrument(cn_etf(exchange=exchange))
 
 
 def test_china_rulebook_rejects_us_instrument() -> None:
     with pytest.raises(ValueError, match="requires market=CN"):
         ChinaEquityRuleBook().validate_instrument(us_stock())
+
+
+def test_china_rulebook_rejects_cn_instrument_on_us_exchange() -> None:
+    with pytest.raises(ValueError, match="requires exchange=XSHG or XSHE"):
+        ChinaEquityRuleBook().validate_instrument(cn_etf(exchange=Exchange.XNAS))
+
+
+def test_china_rulebook_rejects_cn_instrument_with_usd_currency() -> None:
+    with pytest.raises(ValueError, match="requires instrument currency=CNY"):
+        ChinaEquityRuleBook().validate_instrument(cn_etf(currency=Currency.USD))
 
 
 @pytest.mark.parametrize("quantity", [Decimal("0"), Decimal("-1")])
@@ -102,6 +117,25 @@ def test_china_rulebook_validates_only_supported_manual_plan_rules() -> None:
     )
 
     ChinaEquityRuleBook().validate_order_plan(plan)
+
+
+def test_china_rulebook_rejects_plan_currency_mismatching_instrument() -> None:
+    plan = ManualOrderPlan(
+        plan_id="plan-1",
+        account_id="account-cn",
+        strategy_run_id="run-1",
+        instrument_id=cn_etf(),
+        side=OrderSide.BUY,
+        quantity=Decimal("1"),
+        reference_price=Decimal("4.123"),
+        currency=Currency.USD,
+        status=ManualOrderStatus.PENDING_REVIEW,
+        created_at=datetime(2026, 9, 3, 9, 30, tzinfo=ZoneInfo("Asia/Shanghai")),
+        reason="human review required",
+    )
+
+    with pytest.raises(ValueError, match="plan currency must match instrument currency"):
+        ChinaEquityRuleBook().validate_order_plan(plan)
 
 
 def test_domain_and_markets_do_not_import_forbidden_dependencies() -> None:

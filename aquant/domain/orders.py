@@ -37,7 +37,7 @@ class ManualOrderPlan(BaseModel):
     currency: Currency
     status: ManualOrderStatus
     created_at: AwareDatetime
-    reason: str
+    reason: NonEmptyText
 
     @computed_field
     @property
