@@ -6,6 +6,9 @@ pydantic-ai-slim[openai]==1.67.0
 # pydantic-ai-slim[openai]==1.67.0 requires openai 2.x.
 openai>=2.25.0
 pandas>=2.2.0
+# Local historical bars (no database server or online provider)
+duckdb==1.5.5
+pyarrow==25.0.1
 requests>=2.32.0
 beautifulsoup4>=4.13.0
 python-dotenv>=1.0.0
