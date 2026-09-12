@@ -8,10 +8,11 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from aquant.data import HistoryRequest, MarketDataSet, empty_history_frame
+from aquant.data import HistoryRequest, MarketDataSet
 
-from ._layout import local_dataset, local_root, matching_files, partition_path, require_daily
+from ._layout import local_dataset, local_root, partition_path, require_daily
 from .base import HistoricalDataStore
+from .duckdb_reader import DuckDBHistoryReader
 
 
 class ParquetHistoryStore(HistoricalDataStore):
@@ -74,14 +75,4 @@ class ParquetHistoryStore(HistoricalDataStore):
             temporary.unlink(missing_ok=True)
 
     def read(self, request: HistoryRequest) -> MarketDataSet:
-        files = matching_files(self._root, request)
-        frames = [
-            pq.read_table(path, filters=[
-                ("instrument_key", "in", [item.canonical_key for item in request.instruments]),
-                ("trade_date", ">=", request.start_date),
-                ("trade_date", "<=", request.end_date),
-            ]).to_pandas(date_as_object=True)
-            for path in files
-        ]
-        data = pd.concat(frames, ignore_index=True) if frames else empty_history_frame()
-        return local_dataset(data, request.frequency, request.adjustment)
+        return DuckDBHistoryReader(self._root).read(request)
