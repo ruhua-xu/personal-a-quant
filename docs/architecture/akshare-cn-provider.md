@@ -2,10 +2,24 @@
 
 ## Interface audit
 
-Audited against installed AkShare **1.18.94**. The current backend requirement
-is `akshare>=1.17.24`; the inherited full requirements file pins `1.17.24`.
-Neither constraint nor the legacy `ashare/data.py` implementation is changed.
-Only 1.18.94 was verified in this phase; dependency upgrades need contract review.
+The current Provider contract is locked to AkShare **1.18.94**.
+`requirements_api.txt`, `requirements.txt` and `requirements_mac.txt` all pin
+`akshare==1.18.94`. No other dependency versions or legacy data implementations
+were changed for this lock.
+
+Each valid `get_history` request checks locally installed distribution metadata
+before importing/calling AkShare. Only the exact version `1.18.94` is accepted,
+including when AkShare is already imported in the process. A version mismatch,
+missing installation or unreadable version raises `MarketDataProviderError`
+with installed and supported/tested version information. The check is not cached.
+Importing `aquant.data.providers` and constructing the provider do not import
+AkShare or read its version metadata, so they work without AkShare installed.
+
+An AkShare upgrade must re-audit the selected interfaces, re-run schema and RAW
+semantic verification (including the ETF raw endpoint evidence below), and run
+the offline provider/store and legacy regression tests. Change the three pins,
+runtime version guard and documentation together only after that verification;
+passing mocked conversion tests alone does not establish new upstream semantics.
 
 The legacy module uses `stock_zh_a_hist(..., adjust="qfq")`. That is not reused:
 in the inspected version, `stock_zh_a_hist` guesses the exchange from the symbol,

@@ -19,4 +19,5 @@ pytz>=2025.1
 
 # Data sources (Ashare.py imports yfinance; akshare is used as fallback)
 yfinance>=0.2.36
-akshare>=1.17.24
+# Provider schema/RAW contract audited at this exact version.
+akshare==1.18.94

@@ -6,6 +6,7 @@ only when a supported request is actually executed.
 """
 
 from datetime import date, datetime, time, timezone
+from importlib.metadata import PackageNotFoundError, version as distribution_version
 from numbers import Number
 import re
 
@@ -22,6 +23,7 @@ from aquant.markets.china import ChinaEquityRuleBook
 from .base import MarketDataProvider, MarketDataProviderError, ProviderSchemaError
 
 
+SUPPORTED_AKSHARE_VERSION = "1.18.94"
 _EXCHANGE_PREFIX = {Exchange.XSHG: "sh", Exchange.XSHE: "sz"}
 # Sina currently returns English fields. Chinese aliases are an explicit
 # normalization contract, not an assumption about the selected API's schema.
@@ -33,6 +35,30 @@ _COLUMN_ALIASES = {
     "close": ("close", "收盘"),
     "volume": ("volume", "成交量"),
 }
+
+
+def _check_akshare_version() -> None:
+    """Check local distribution metadata on use, without importing AkShare."""
+    supported = f"supported/tested={SUPPORTED_AKSHARE_VERSION}"
+    try:
+        installed = distribution_version("akshare")
+    except PackageNotFoundError as exc:
+        raise MarketDataProviderError(
+            f"AkShare is not installed: installed=<not installed>; {supported}",
+        ) from exc
+    except Exception as exc:
+        raise MarketDataProviderError(
+            f"Cannot read AkShare version: installed=<unknown>; {supported}",
+        ) from exc
+    if not isinstance(installed, str) or not installed:
+        raise MarketDataProviderError(
+            f"Cannot read AkShare version: installed={installed!r}; {supported}",
+        )
+    if installed != SUPPORTED_AKSHARE_VERSION:
+        raise MarketDataProviderError(
+            f"Unsupported AkShare version: installed={installed!r}; {supported}. "
+            "Upgrades require schema and RAW semantic revalidation.",
+        )
 
 
 def _daily_date(value: object) -> date:
@@ -82,6 +108,7 @@ class AkShareChinaDataProvider(MarketDataProvider):
             if previous != instrument:
                 raise ValueError("conflicting instrument metadata for the same canonical_key")
 
+        _check_akshare_version()
         frames = []
         for instrument in instruments.values():
             response = self._fetch(instrument, request)

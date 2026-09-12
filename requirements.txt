@@ -79,5 +79,5 @@ urllib3==2.3.0
 wcwidth==0.2.13
 webencodings==0.5.1
 yarg==0.1.9
-akshare==1.17.24
+akshare==1.18.94
 yfinance==0.2.36
