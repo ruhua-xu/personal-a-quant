@@ -5,6 +5,14 @@ from abc import ABC, abstractmethod
 from aquant.data.models import HistoryRequest, MarketDataSet
 
 
+class MarketDataProviderError(RuntimeError):
+    """Acquisition failed; callers must not interpret this as no history."""
+
+
+class ProviderSchemaError(MarketDataProviderError):
+    """The provider response cannot satisfy the standard data contract."""
+
+
 class MarketDataProvider(ABC):
     """Return standard bars; unsupported frequency/adjustment raises ValueError.
 
