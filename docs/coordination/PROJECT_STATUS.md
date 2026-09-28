@@ -1,8 +1,69 @@
 # PROJECT_STATUS
 
-维护者：编码角色。下方保留架构 / Review 角色的初始化记录；预检或文档初始化均不代表 Phase 2D-B 实现完成。
+维护者：编码角色。下方保留历次交付及初始化记录；历史待审状态不覆盖后续架构结论。
 
-## 当前记录：2026-09-28 Phase 2D-B 实现交付
+## 当前记录：2026-09-28 Phase 3A 实现交付
+
+| 项目 | 状态 |
+| --- | --- |
+| 当前任务 | Phase 3A — Universe + ResearchConfig + ResearchRun |
+| Status | `READY_FOR_ARCH_REVIEW`；仅离线模型与身份契约，等待架构审查 |
+| Active branch | `feat/phase2d-data-versioning`；继续原分支，未修改 main |
+| 实现起点 / 开始时 HEAD | `c8f18e4daa88955874596fd8a032fb3709fbc70c` |
+| 前置验收 | Phase 2D-B 已由架构角色 ACCEPTED，见本地 ARCH_REVIEW_PHASE_2D_B；不等于正式研究已验收 |
+| HEAD SHA（实现已推送、状态文档提交前观察） | `557455854efcf59fbb306ef2597b76c05a610731` |
+| 本次实现 commit SHA | `557455854efcf59fbb306ef2597b76c05a610731` — `feat: add offline research contracts` |
+| 状态文档提交 | 独立交接提交，不要求文档包含自身最终 SHA |
+| push（状态文档提交前观察） | 实现 commit 已推送 `origin/feat/phase2d-data-versioning`，ls-remote 核对 SHA 一致；本状态文档随独立交接提交推送，最终交接 SHA 以实际 HEAD / 远端为准 |
+| Blocker | 实现无阻塞；npm 缺失且仅现有 Node 24 可用，Node 20–22 支持环境的 build/lint 验证仍缺失 |
+| 架构验收 | `NOT_REVIEWED`；本记录不是 ACCEPTED |
+| 下一阶段 | Phase 3B 未开始；Phase 3 正式研究仍 blocked，等待 3A–3D 及真实输入质量审查 |
+
+### 修改文件与交付范围
+
+- `aquant/research/__init__.py`：导出离线研究契约，无启动副作用。
+- `aquant/research/universe.py`：CN ETF 完整身份、成员规范化、定义/快照内容版本、UTC、严格 JSON 深拷贝和重核验。
+- `aquant/research/models.py`：展开默认配置/精确权重/参数哈希、日期切分、跨对象验证、运行状态/审计元数据与最小输出包装。
+- `tests/aquant/research/__init__.py`、`conftest.py`、`test_universe.py`、`test_models.py`、`test_boundaries.py`：合成元数据、身份/参数/状态/篡改/深拷贝测试，独立违规代码检查及无文件/网络访问检查；继承已有断网 fixture。
+- `docs/architecture/research-contracts-phase3a.md`：固定 Schema 1 字段、已核对 golden hash、known_at 午夜边界、JSON 生命周期与本阶段限制。
+- `docs/coordination/PROJECT_STATUS.md`：本次交接记录；与实现提交区分。
+
+未修改 domain、SecurityScore、MarketRuleBook、data manifest/hash、snapshot/store、Provider、旧 OpenAshare、API、前端、SQLite 或依赖文件。未读行情、未创建真实 Universe/研究数据、未算因子/评分/指标、未运行 Runner；没有进入 3B，没有交易功能。
+
+### 验证证据
+
+环境：Python 3.12.2；Pydantic 2.13.5、pandas 3.0.5、PyArrow 25.0.1、DuckDB 1.5.5、pytest 9.1.1；Node 24.19.0。未安装或升级依赖。
+
+| 检查 | 最终结果 |
+| --- | --- |
+| `python -m pytest tests/aquant/research -q` | 175 passed，0 failed |
+| `python -m pytest tests/aquant -q` | 672 passed，0 failed（含已有 497 项） |
+| `tests/test_api_app.py -q` | 64 passed，0 failed；进程内 pytest.main + 离线隔离 |
+| `tests/test_us_market.py -q` | 9 passed，0 failed；独立进程 pytest.main + 离线隔离 |
+| `npm run build` / `npm run lint` | 已尝试；npm 不在 PATH，未能通过 npm 启动 |
+| `node node_modules/next/dist/bin/next build` | 通过；编译、TypeScript、21 页生成成功；Node 24 的补充证据，不是支持版本验证 |
+| `node node_modules/eslint/bin/eslint.js app components lib next.config.ts` | 0 errors，10 warnings；同属 Node 24 补充验证 |
+| 新增 warning | Python 无 warning；ESLint 10 条与既有基线同类且均在未修改的 app/components 文件；没有新 warning |
+| Git 提示 | 新文件暂存时提示 LF 将转换为 CRLF，来自现有 Windows 设置；未修改 Git 配置，不是运行时 warning |
+| `git diff --check` | 通过；提交前复核暂存范围与空白错误 |
+
+API / 美股沿用进程内隔离：关闭默认行情预热，外部 socket/DNS 禁用，requests 抛离线 ConnectionError，只允许 Windows asyncio 所需 loopback；保留原测试 mock，未访问实时网站，未改旧测试或提交本机辅助配置。
+
+首轮新测试校准了完整字段数、canonical_key 字典序及独立计算的固定摘要；无 I/O 测试预加载标准库时区资源后再封锁文件调用，不 mock 市场规则。最终全部通过。没有为通过回归修改既有业务逻辑。
+
+### Review 重点与限制
+
+- 三类身份都共享创建/加载/复核的规范化逻辑。固定摘要另以手工展开 JSON + 标准库 SHA 核对；未复用 Dataset 专属版本算法。
+- 评分起点为 research_period.start_date 在 RuleBook 时区的午夜，prospective known_at 等于允许、晚 1 微秒拒绝。retrospective_manual 仍保留事后选池限制。
+- 配置单独验证不代表完成跨对象验证，必须显式调用 `validate_research_inputs`；该入口也不核验实际 manifest、数据质量或证据文件。
+- 模型顶层 frozen 并非深度不可变；JSON 输出前、加载时及显式 verify 会重核验。没有文件保存/实验发布功能。
+- Git SHA、运行版本、许可/审查引用均为调用者声明；没有自动环境探测、内容读取或真实性背书。FAILED/未完成与成功分开，test 已开始即标消耗。
+- FactorSnapshot / ResearchResult 仅最小 schema；缺分数/统计保留 None，promotion_level 最高 1，不自动形成研究成果或晋级结论。
+- 当前 Node 超出项目 `>=20 <23` 范围；待在 Node 20–22 复核，不把本次补充构建写成支持环境验收。无关 10 条 ESLint warning 未修复。
+- 既有 `AGENTS.md`、未跟踪 CURRENT_TASK、ETF 架构参考、2D-B 审查文件保持内容不变，未纳入本次提交；CURRENT_TASK 由架构角色维护，编码角色不改任务范围或状态。
+- 完成推送后停止，仅交架构 Review，不自行进入 Phase 3B。
+
+## 历史记录：2026-09-28 Phase 2D-B 实现交付
 
 | 项目 | 状态 |
 | --- | --- |
